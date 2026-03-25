@@ -2,6 +2,7 @@ const jwt = require("jsonwebtoken");
 const config = require("../config/auth.config.js");
 const db = require("../models");
 const User = db.user;
+const { isTokenBlacklisted } = require("../utils/tokenBlacklist");
 
 const verifyToken = (req, res, next) => {
   const authHeader = req.headers.authorization || "";
@@ -12,24 +13,35 @@ const verifyToken = (req, res, next) => {
     return res.status(403).send({ message: "No token provided!" });
   }
 
+  if (isTokenBlacklisted(token)) {
+    return res.status(401).send({ message: "Token is logged out." });
+  }
+
   jwt.verify(token, config.secret, (err, decoded) => {
     if (err) {
       return res.status(401).send({
         message: "Unauthorized!",
       });
     }
-    User.findById(decoded.id).exec((dbErr, user) => {
+    const userId = decoded.userId || decoded.id;
+    User.findById(userId).exec((dbErr, user) => {
       if (dbErr) {
         return res.status(500).send({ message: dbErr.message || "Authorization error." });
       }
       if (!user) {
         return res.status(404).send({ message: "User not found." });
       }
-      if (!user.isLoggedIn) {
-        return res.status(401).send({ message: "Session expired. Please sign in again." });
-      }
-
-      req.userId = decoded.id;
+      req.userId = userId;
+      // Attach a safe user object (without password) to request.
+      req.user = {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        profilePic: user.profilePic,
+        dob: user.dob,
+        salary: user.salary,
+        role: user.role,
+      };
       next();
     });
   });

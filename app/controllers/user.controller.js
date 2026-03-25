@@ -40,21 +40,48 @@ exports.managerBoard = (req, res) => {
   res.status(200).send("Manager Content.");
 };
 
+exports.managerTeam = async (req, res) => {
+  try {
+    const managerId = req.userId;
+
+    // If your DB has a legacy `managerId` field, this will use it.
+    // Otherwise, it falls back to all employees (still view-only).
+    let employees = await User.find({ role: "employee", managerId }).exec();
+    if (!employees || employees.length === 0) {
+      employees = await User.find({ role: "employee" }).exec();
+    }
+
+    const sanitized = employees.map((u) => ({
+      id: u._id,
+      name: u.name,
+      email: u.email,
+      dob: u.dob,
+      profilePic: u.profilePic,
+    }));
+
+    return res.status(200).send({ items: sanitized });
+  } catch (err) {
+    return res.status(500).send({ message: err.message || "Failed to load manager team." });
+  }
+};
+
 exports.updateMe = async (req, res) => {
   try {
     const userId = req.userId;
     const user = await User.findById(userId).exec();
     if (!user) return res.status(404).send({ message: "User not found." });
 
-    // Never allow email/password updates from profile edit.
-    if (Object.prototype.hasOwnProperty.call(req.body || {}, "email")) {
-      return res.status(400).send({ message: "Email cannot be changed." });
+    // Role/salary updates must use separate admin endpoints.
+    const body = req.body || {};
+    if (Object.prototype.hasOwnProperty.call(body, "role") || Object.prototype.hasOwnProperty.call(body, "salary") || Object.prototype.hasOwnProperty.call(body, "monthlySalary")) {
+      return res.status(400).send({ message: "role and salary cannot be updated here." });
     }
-    if (Object.prototype.hasOwnProperty.call(req.body || {}, "password")) {
+
+    if (Object.prototype.hasOwnProperty.call(body, "password")) {
       return res.status(400).send({ message: "Password cannot be changed here." });
     }
 
-    const { name, dob, salary, monthlySalary, role } = req.body || {};
+    const { name, dob, email } = body;
 
     if (name !== undefined) user.name = String(name).trim();
 
@@ -68,25 +95,43 @@ exports.updateMe = async (req, res) => {
       user.profilePic = `/uploads/${req.file.filename}`;
     }
 
-    // `role` and `salary` can only be changed by admin (enforced by middleware).
-    const salaryInput = salary === undefined ? monthlySalary : salary;
-    if (salaryInput !== undefined) {
-      if (salaryInput === "" || salaryInput === null) user.salary = 0;
-      else {
-        const s = Number(salaryInput);
-        if (Number.isNaN(s) || s < 0) return res.status(400).send({ message: "salary must be non-negative." });
-        user.salary = s;
-      }
-    }
-
-    if (role !== undefined) {
-      const normalizedRole = String(role).trim().toLowerCase();
-      user.role = normalizedRole;
+    if (email !== undefined) {
+      const nextEmail = String(email).trim().toLowerCase();
+      const exists = await User.findOne({ email: nextEmail, _id: { $ne: userId } }).exec();
+      if (exists) return res.status(400).send({ message: "Email is already in use." });
+      user.email = nextEmail;
     }
 
     await user.save();
     return res.status(200).send({ user: sanitizeUser(user) });
   } catch (err) {
     return res.status(500).send({ message: err.message || "Profile update failed." });
+  }
+};
+
+exports.changePasswordMe = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const user = await User.findById(userId).exec();
+    if (!user) return res.status(404).send({ message: "User not found." });
+
+    const { currentPassword, newPassword } = req.body || {};
+    if (!currentPassword || !newPassword) {
+      return res.status(400).send({ message: "currentPassword and newPassword are required." });
+    }
+    if (String(newPassword).length < 6) {
+      return res.status(400).send({ message: "Password must be at least 6 characters." });
+    }
+
+    const bcrypt = require("bcryptjs");
+    const ok = bcrypt.compareSync(currentPassword, user.password);
+    if (!ok) return res.status(401).send({ message: "Current password is incorrect." });
+
+    user.password = String(newPassword);
+    await user.save(); // hashes via pre-save hook
+
+    return res.status(200).send({ message: "Password updated successfully." });
+  } catch (err) {
+    return res.status(500).send({ message: err.message || "Password update failed." });
   }
 };

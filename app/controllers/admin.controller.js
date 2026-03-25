@@ -16,6 +16,8 @@ const toUserDTO = (user) => ({
   updatedAt: user.updatedAt,
 });
 
+const ALLOWED_ROLES = ["admin", "manager", "employee"];
+
 exports.createUserByAdmin = async (req, res) => {
   try {
     const { name, email, password, dob, salary, monthlySalary, role } = req.body;
@@ -76,6 +78,7 @@ exports.listUsers = async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page || "1", 10));
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit || "10", 10)));
     const search = (req.query.search || "").trim();
+    const roleFilter = (req.query.role || "").toString().trim().toLowerCase();
 
     const filter = {};
     if (search) {
@@ -83,6 +86,13 @@ exports.listUsers = async (req, res) => {
         { name: { $regex: search, $options: "i" } },
         { email: { $regex: search, $options: "i" } },
       ];
+    }
+
+    if (roleFilter) {
+      if (!ALLOWED_ROLES.includes(roleFilter)) {
+        return res.status(400).send({ message: "Invalid role filter." });
+      }
+      filter.role = roleFilter;
     }
 
     const [items, total] = await Promise.all([
@@ -222,6 +232,107 @@ exports.deleteUserByAdmin = async (req, res) => {
     return res.status(200).send({ message: "User deleted successfully." });
   } catch (err) {
     return res.status(500).send({ message: err.message || "Delete failed." });
+  }
+};
+
+exports.updateUserRoleByAdmin = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { role } = req.body || {};
+    const nextRole = String(role || "").trim().toLowerCase();
+
+    if (!nextRole) {
+      return res.status(400).send({ message: "role is required." });
+    }
+    if (!ALLOWED_ROLES.includes(nextRole)) {
+      return res.status(400).send({ message: "Invalid role value." });
+    }
+
+    const user = await User.findById(userId).exec();
+    if (!user) return res.status(404).send({ message: "User not found." });
+
+    user.role = nextRole;
+    await user.save();
+
+    const updated = await User.findById(userId).exec();
+    return res.status(200).send({ user: toUserDTO(updated) });
+  } catch (err) {
+    return res.status(500).send({ message: err.message || "Update role failed." });
+  }
+};
+
+exports.updateUserSalaryByAdmin = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { salary, monthlySalary } = req.body || {};
+    const salaryInput = salary === undefined ? monthlySalary : salary;
+
+    if (salaryInput === undefined) {
+      return res.status(400).send({ message: "salary is required." });
+    }
+
+    const salaryValue = salaryInput === "" || salaryInput === null ? 0 : Number(salaryInput);
+    if (Number.isNaN(salaryValue) || salaryValue < 0) {
+      return res.status(400).send({ message: "salary must be non-negative." });
+    }
+
+    const user = await User.findById(userId).exec();
+    if (!user) return res.status(404).send({ message: "User not found." });
+
+    user.salary = salaryValue;
+    await user.save();
+
+    const updated = await User.findById(userId).exec();
+    return res.status(200).send({ user: toUserDTO(updated) });
+  } catch (err) {
+    return res.status(500).send({ message: err.message || "Update salary failed." });
+  }
+};
+
+exports.updateUserDetailsByAdmin = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { name, email, dob } = req.body || {};
+
+    // Ensure role and salary cannot be updated here.
+    if (
+      Object.prototype.hasOwnProperty.call(req.body || {}, "role") ||
+      Object.prototype.hasOwnProperty.call(req.body || {}, "salary") ||
+      Object.prototype.hasOwnProperty.call(req.body || {}, "monthlySalary")
+    ) {
+      return res.status(400).send({ message: "role and salary cannot be updated here." });
+    }
+
+    const user = await User.findById(userId).exec();
+    if (!user) return res.status(404).send({ message: "User not found." });
+
+    if (name !== undefined) user.name = String(name).trim();
+
+    if (email !== undefined) {
+      const nextEmail = String(email).trim().toLowerCase();
+      const exists = await User.findOne({ email: nextEmail, _id: { $ne: userId } }).exec();
+      if (exists) return res.status(400).send({ message: "Email is already in use." });
+      user.email = nextEmail;
+    }
+
+    if (dob !== undefined) {
+      if (!dob) user.dob = null;
+      else {
+        const parsed = new Date(dob);
+        if (Number.isNaN(parsed.getTime())) return res.status(400).send({ message: "Invalid DOB format." });
+        user.dob = parsed;
+      }
+    }
+
+    if (req.file) {
+      user.profilePic = `/uploads/${req.file.filename}`;
+    }
+
+    await user.save();
+    const updated = await User.findById(userId).exec();
+    return res.status(200).send({ user: toUserDTO(updated) });
+  } catch (err) {
+    return res.status(500).send({ message: err.message || "Update user failed." });
   }
 };
 

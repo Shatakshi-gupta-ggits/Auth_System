@@ -13,17 +13,37 @@ module.exports = function (app) {
     [authJwt.verifyToken, authJwt.isAdmin, upload.single("profilePic")],
     controller.createUserByAdmin
   );
+
   app.get("/api/admin/users/:id", [authJwt.verifyToken, authJwt.isAdmin], controller.getUserById);
   app.patch(
     "/api/admin/users/:id/promote-manager",
     [authJwt.verifyToken, authJwt.isAdmin],
     controller.promoteToManager
   );
+
   app.patch(
     "/api/admin/users/:id",
     [authJwt.verifyToken, authJwt.isAdmin, upload.single("profilePic")],
     controller.updateUserByAdmin
   );
+
+  // Task 3: admin-only management endpoints
+  app.put(
+    "/api/admin/users/:id/role",
+    [authJwt.verifyToken, authJwt.isAdmin],
+    controller.updateUserRoleByAdmin
+  );
+  app.put(
+    "/api/admin/users/:id/salary",
+    [authJwt.verifyToken, authJwt.isAdmin],
+    controller.updateUserSalaryByAdmin
+  );
+  app.put(
+    "/api/admin/users/:id",
+    [authJwt.verifyToken, authJwt.isAdmin, upload.single("profilePic")],
+    controller.updateUserDetailsByAdmin
+  );
+
   app.delete(
     "/api/admin/users/:id",
     [authJwt.verifyToken, authJwt.isAdmin],

@@ -2,6 +2,8 @@ const express = require("express");
 const cors = require("cors");
 const cookieSession = require("cookie-session");
 const path = require("path");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 
 require("dotenv").config();
 
@@ -9,7 +11,14 @@ const dbConfig = require("./app/config/db.config");
 
 const app = express();
 
-app.use(cors());
+const allowedClientOrigin = process.env.CLIENT_ORIGIN || "http://localhost:5173";
+app.use(
+  cors({
+    origin: allowedClientOrigin,
+    credentials: true,
+  })
+);
+app.use(helmet());
 /* for Angular Client (withCredentials) */
 // app.use(
 //   cors({

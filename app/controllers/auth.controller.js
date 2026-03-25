@@ -22,6 +22,15 @@ const parseOptionalDate = (value) => {
   return Number.isNaN(d.getTime()) ? undefined : d;
 };
 
+function getJwtUserPayload(token) {
+  try {
+    const decoded = jwt.verify(token, config.secret);
+    return decoded || {};
+  } catch {
+    return {};
+  }
+}
+
 const getUserIdFromSessionToken = (req) => {
   try {
     const token = req.session?.token;
@@ -30,6 +39,142 @@ const getUserIdFromSessionToken = (req) => {
     return decoded?.id || null;
   } catch {
     return null;
+  }
+};
+
+const { blacklistToken } = require("../utils/tokenBlacklist");
+
+exports.register = async (req, res) => {
+  try {
+    const { name, email, password, dob } = req.body || {};
+
+    if (!name || !email || !password) {
+      return res.status(400).send({ message: "name, email and password are required." });
+    }
+
+    // role/salary must not be accepted from client.
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, "role")) {
+      return res.status(400).send({ message: "role must not be provided by the client." });
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, "salary")) {
+      return res.status(400).send({ message: "salary must not be provided by the client." });
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, "monthlySalary")) {
+      return res.status(400).send({ message: "monthlySalary must not be provided by the client." });
+    }
+
+    const pwd = String(password);
+    const ok =
+      pwd.length >= 8 && /[a-z]/.test(pwd) && /[A-Z]/.test(pwd) && /\d/.test(pwd);
+    if (!ok) {
+      return res.status(400).send({
+        message: "Password must be 8+ chars and include upper, lower, and a number.",
+      });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+
+    const parsedDob = parseOptionalDate(dob);
+    if (parsedDob === undefined) {
+      return res.status(400).send({ message: "Invalid DOB format." });
+    }
+
+    const profilePic = req.file ? `/uploads/${req.file.filename}` : null;
+
+    const user = new User({
+      name: String(name).trim(),
+      email: normalizedEmail,
+      password, // hashed by model pre-save hook
+      profilePic,
+      dob: parsedDob ?? null,
+      salary: 0,
+      role: "employee",
+      isLoggedIn: true,
+      lastLoginAt: new Date(),
+    });
+
+    await user.save();
+
+    const token = jwt.sign(
+      { userId: user._id.toString(), email: user.email, role: user.role },
+      config.secret,
+      { expiresIn: "7d" }
+    );
+
+    req.session.token = token;
+    req.session.userId = String(user._id);
+
+    return res.status(201).send({
+      token,
+      user: sanitizeUser(user),
+    });
+  } catch (err) {
+    if (err.code === 11000) {
+      return res.status(400).send({ message: "Email is already in use." });
+    }
+    return res.status(500).send({ message: err.message || "Register failed." });
+  }
+};
+
+exports.login = async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).send({ message: "email and password are required." });
+    }
+
+    const user = await User.findOne({ email: String(email).trim().toLowerCase() }).exec();
+    if (!user) {
+      return res.status(404).send({ message: "User not found." });
+    }
+
+    const passwordIsValid = bcrypt.compareSync(password, user.password);
+    if (!passwordIsValid) {
+      return res.status(401).send({ message: "Invalid password." });
+    }
+
+    user.isLoggedIn = true;
+    user.lastLoginAt = new Date();
+    await user.save();
+
+    const token = jwt.sign(
+      { userId: user._id.toString(), email: user.email, role: user.role },
+      config.secret,
+      { expiresIn: "7d" }
+    );
+
+    req.session.token = token;
+    req.session.userId = String(user._id);
+
+    return res.status(200).send({
+      token,
+      user: sanitizeUser(user),
+    });
+  } catch (err) {
+    return res.status(500).send({ message: err.message || "Login failed." });
+  }
+};
+
+exports.logout = async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization || "";
+    const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    const token = bearerToken || req.session?.token;
+
+    if (token) {
+      blacklistToken(token);
+      // Mark user logged out if we can decode.
+      const payload = getJwtUserPayload(token);
+      const userId = payload.userId || payload.id;
+      if (userId) {
+        await User.findByIdAndUpdate(userId, { isLoggedIn: false }).exec().catch(() => null);
+      }
+    }
+
+    req.session = null;
+    return res.status(200).send({ message: "Logged out." });
+  } catch (err) {
+    return res.status(500).send({ message: err.message || "Logout failed." });
   }
 };
 

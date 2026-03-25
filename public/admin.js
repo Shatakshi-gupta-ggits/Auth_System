@@ -106,13 +106,17 @@ function renderUsersRows(items) {
         user.salary === null || user.salary === undefined ? "" : String(user.salary)
       );
       if (newSalary === null) return;
-      const payload = {
-        name: newName.trim(),
-        dob: newDob.trim(),
-        salary: newSalary.trim(),
-      };
-      const updateResp = await api(`/api/admin/users/${user.id}`, { method: "PATCH", body: payload });
-      show({ update: updateResp });
+      // Task 3: role and salary must be updated via their dedicated endpoints.
+      // Use FormData to be compatible with multer's `upload.single("profilePic")` middleware.
+      const fd = new FormData();
+      fd.append("name", newName.trim());
+      fd.append("dob", newDob.trim());
+      const detailsResp = await api(`/api/admin/users/${user.id}`, { method: "PUT", body: fd });
+      const salaryResp = await api(`/api/admin/users/${user.id}/salary`, {
+        method: "PUT",
+        body: { salary: newSalary.trim() },
+      });
+      show({ update: detailsResp, salary: salaryResp });
       await loadUsersTable();
     });
 
@@ -179,9 +183,21 @@ document.getElementById("updateForm").addEventListener("submit", async (e) => {
   const fd = new FormData(e.currentTarget);
   const id = (fd.get("id") || "").toString().trim();
   fd.delete("id");
-  const resp = await api(`/api/admin/users/${id}`, { method: "PATCH", body: fd });
-  show({ update: resp });
-  if (resp.ok) await loadUsersTable();
+  // Extract salary separately (Task 3 endpoint).
+  const salaryValue = fd.get("salary");
+  fd.delete("salary");
+
+  const detailsResp = await api(`/api/admin/users/${id}`, { method: "PUT", body: fd });
+  let salaryResp = null;
+  if (salaryValue !== null && salaryValue !== undefined && salaryValue.toString().trim() !== "") {
+    salaryResp = await api(`/api/admin/users/${id}/salary`, {
+      method: "PUT",
+      body: { salary: salaryValue.toString().trim() },
+    });
+  }
+
+  show({ update: detailsResp, salary: salaryResp });
+  if (detailsResp.ok) await loadUsersTable();
 });
 
 document.getElementById("deleteForm").addEventListener("submit", async (e) => {

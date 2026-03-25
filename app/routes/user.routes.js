@@ -26,9 +26,22 @@ module.exports = function(app) {
     controller.adminBoard
   );
 
+  // Manager can view their team (employees) - view-only.
+  app.get(
+    "/api/manager/team",
+    [authJwt.verifyToken, authJwt.isManager],
+    controller.managerTeam
+  );
+
   app.patch(
     "/api/user/me",
     [authJwt.verifyToken, verifyAdminRoleAndSalary, upload.single("profilePic")],
     controller.updateMe
+  );
+
+  app.put(
+    "/api/user/change-password",
+    [authJwt.verifyToken],
+    controller.changePasswordMe
   );
 };
