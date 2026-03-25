@@ -11,7 +11,8 @@ const sanitizeUser = (userDoc) => ({
   email: userDoc.email,
   profilePic: userDoc.profilePic,
   dob: userDoc.dob,
-  monthlySalary: userDoc.monthlySalary,
+  salary: userDoc.salary,
+  monthlySalary: userDoc.monthlySalary, // backward compatibility
   role: userDoc.role,
 });
 
@@ -34,7 +35,7 @@ const getUserIdFromSessionToken = (req) => {
 
 exports.signup = async (req, res) => {
   try {
-    const { name, email, password, dob, monthlySalary, role } = req.body;
+    const { name, email, password, dob, salary, monthlySalary, role } = req.body;
     if (!name || !email || !password) {
       return res.status(400).send({ message: "name, email and password are required." });
     }
@@ -57,22 +58,24 @@ exports.signup = async (req, res) => {
       return res.status(400).send({ message: "Invalid DOB format." });
     }
 
+    const salaryInput = salary === undefined ? monthlySalary : salary;
     const salaryValue =
-      monthlySalary === undefined || monthlySalary === null || monthlySalary === ""
+      salaryInput === undefined || salaryInput === null || salaryInput === ""
         ? null
-        : Number(monthlySalary);
+        : Number(salaryInput);
     if (salaryValue !== null && (Number.isNaN(salaryValue) || salaryValue < 0)) {
-      return res.status(400).send({ message: "monthlySalary must be a non-negative number." });
+      return res.status(400).send({ message: "salary must be a non-negative number." });
     }
 
     const profilePic = req.file ? `/uploads/${req.file.filename}` : null;
     const user = new User({
       name: String(name).trim(),
       email: normalizedEmail,
-      password: bcrypt.hashSync(password, 8),
+      // password will be hashed by the model pre-save hook
+      password,
       profilePic,
       dob: parsedDob ?? null,
-      monthlySalary: salaryValue,
+      salary: salaryValue === null ? 0 : salaryValue,
       role: wantedRole,
     });
 

@@ -7,7 +7,8 @@ const toUserDTO = (user) => ({
   email: user.email,
   profilePic: user.profilePic,
   dob: user.dob,
-  monthlySalary: user.monthlySalary,
+  salary: user.salary,
+  monthlySalary: user.monthlySalary, // backward compatibility
   role: user.role,
   isLoggedIn: user.isLoggedIn,
   lastLoginAt: user.lastLoginAt,
@@ -17,7 +18,7 @@ const toUserDTO = (user) => ({
 
 exports.createUserByAdmin = async (req, res) => {
   try {
-    const { name, email, password, dob, monthlySalary, role } = req.body;
+    const { name, email, password, dob, salary, monthlySalary, role } = req.body;
     if (!name || !email || !password) {
       return res.status(400).send({ message: "name, email and password are required." });
     }
@@ -38,22 +39,23 @@ exports.createUserByAdmin = async (req, res) => {
       return res.status(400).send({ message: "Invalid DOB format." });
     }
 
+    const salaryInput = salary === undefined ? monthlySalary : salary;
     const salaryValue =
-      monthlySalary === undefined || monthlySalary === null || monthlySalary === ""
+      salaryInput === undefined || salaryInput === null || salaryInput === ""
         ? null
-        : Number(monthlySalary);
+        : Number(salaryInput);
     if (salaryValue !== null && (Number.isNaN(salaryValue) || salaryValue < 0)) {
-      return res.status(400).send({ message: "monthlySalary must be non-negative." });
+      return res.status(400).send({ message: "salary must be non-negative." });
     }
 
-    const bcrypt = require("bcryptjs");
     const user = new User({
       name: String(name).trim(),
       email: String(email).trim().toLowerCase(),
-      password: bcrypt.hashSync(String(password), 8),
+      // password will be hashed by the model pre-save hook
+      password,
       profilePic: req.file ? `/uploads/${req.file.filename}` : null,
       dob: parsedDob,
-      monthlySalary: salaryValue,
+      salary: salaryValue === null ? 0 : salaryValue,
       role: roleName,
       isLoggedIn: false,
     });
@@ -144,7 +146,7 @@ exports.promoteToManager = async (req, res) => {
 exports.updateUserByAdmin = async (req, res) => {
   try {
     const userId = req.params.id;
-    const { name, dob, monthlySalary } = req.body;
+    const { name, dob, salary, monthlySalary } = req.body;
 
     const user = await User.findById(userId).exec();
     if (!user) {
@@ -170,15 +172,16 @@ exports.updateUserByAdmin = async (req, res) => {
         user.dob = parsed;
       }
     }
-    if (monthlySalary !== undefined) {
-      if (monthlySalary === "" || monthlySalary === null) {
-        user.monthlySalary = null;
+    const salaryInput = salary === undefined ? monthlySalary : salary;
+    if (salaryInput !== undefined) {
+      if (salaryInput === "" || salaryInput === null) {
+        user.salary = 0;
       } else {
-        const salary = Number(monthlySalary);
-        if (Number.isNaN(salary) || salary < 0) {
-          return res.status(400).send({ message: "monthlySalary must be non-negative." });
+        const salaryValue = Number(salaryInput);
+        if (Number.isNaN(salaryValue) || salaryValue < 0) {
+          return res.status(400).send({ message: "salary must be non-negative." });
         }
-        user.monthlySalary = salary;
+        user.salary = salaryValue;
       }
     }
     if (req.file) {

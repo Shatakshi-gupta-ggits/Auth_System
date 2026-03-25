@@ -2,7 +2,7 @@ require("dotenv").config();
 
 const db = require("../app/models");
 const dbConfig = require("../app/config/db.config");
-const bcrypt = require("bcryptjs");
+// Password hashing is done by the User model pre-save hook.
 
 async function main() {
   const emailArg = process.argv[2];
@@ -36,7 +36,7 @@ async function main() {
     const created = new User({
       name: String(nameArg).trim(),
       email,
-      password: bcrypt.hashSync(String(passwordArg), 8),
+      password: String(passwordArg),
       role: "admin",
       isLoggedIn: false,
     });
@@ -46,6 +46,7 @@ async function main() {
     return;
   }
 
+  // If user already exists, keep their password as-is.
   user.role = "admin";
   await user.save();
 

@@ -40,7 +40,8 @@ function renderUserDashboard(user) {
   profileEmail.textContent = user.email || "-";
   profileRoles.textContent = role || "-";
   profileDob.textContent = formatDate(user.dob);
-  profileMonthlySalary.textContent = user.monthlySalary === null || user.monthlySalary === undefined ? "-" : String(user.monthlySalary);
+  profileMonthlySalary.textContent =
+    user.salary === null || user.salary === undefined ? "-" : String(user.salary);
 
   boardMessage.textContent = "Loading board...";
   const boardPath = isManager ? "/api/test/manager" : "/api/test/user";

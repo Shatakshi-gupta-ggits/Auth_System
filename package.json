@@ -7,6 +7,7 @@
     "start": "node server.js",
     "make-admin": "node scripts/make-admin.js",
     "migrate-roles": "node scripts/migrate-roles-to-role.js",
+    "migrate-salary": "node scripts/migrate-monthlysales-to-salary.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [

@@ -55,7 +55,11 @@ async function loadUsersTable() {
 
   const items = resp?.data?.items || [];
   usersTableBody.innerHTML = "";
+  renderUsersRows(items);
+}
 
+function renderUsersRows(items) {
+  usersTableBody.innerHTML = "";
   items.forEach((user) => {
     const tr = document.createElement("tr");
     const roleText = user.role ? String(user.role) : "-";
@@ -67,7 +71,7 @@ async function loadUsersTable() {
       <td>${user.email || "-"}</td>
       <td>${roleText}</td>
       <td>${toDate(user.dob)}</td>
-      <td>${salaryText(user.monthlySalary)}</td>
+      <td>${salaryText(user.salary)}</td>
       <td>${user.isLoggedIn ? "Yes" : "No"}</td>
       <td>${formatDateTime(user.lastLoginAt)}</td>
       <td>${formatDateTime(user.createdAt)}</td>
@@ -99,13 +103,13 @@ async function loadUsersTable() {
       if (newDob === null) return;
       const newSalary = window.prompt(
         "Enter new salary (blank to clear)",
-        user.monthlySalary === null || user.monthlySalary === undefined ? "" : String(user.monthlySalary)
+        user.salary === null || user.salary === undefined ? "" : String(user.salary)
       );
       if (newSalary === null) return;
       const payload = {
         name: newName.trim(),
         dob: newDob.trim(),
-        monthlySalary: newSalary.trim(),
+        salary: newSalary.trim(),
       };
       const updateResp = await api(`/api/admin/users/${user.id}`, { method: "PATCH", body: payload });
       show({ update: updateResp });
@@ -147,25 +151,7 @@ document.getElementById("searchForm").addEventListener("submit", async (e) => {
   const resp = await api(path);
   show({ listUsers: resp });
   if (resp.ok && Array.isArray(resp?.data?.items)) {
-    usersTableBody.innerHTML = "";
-    resp.data.items.forEach((u) => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${u.id || "-"}</td>
-        <td>${u.profilePic ? `<img src="${u.profilePic}" alt="pic" class="avatarThumb" />` : "-"}</td>
-        <td>${u.name || "-"}</td>
-        <td>${u.email || "-"}</td>
-        <td>${u.role ? String(u.role) : "-"}</td>
-        <td>${toDate(u.dob)}</td>
-        <td>${salaryText(u.monthlySalary)}</td>
-        <td>${u.isLoggedIn ? "Yes" : "No"}</td>
-        <td>${formatDateTime(u.lastLoginAt)}</td>
-        <td>${formatDateTime(u.createdAt)}</td>
-        <td>${formatDateTime(u.updatedAt)}</td>
-        <td>-</td>
-      `;
-      usersTableBody.appendChild(tr);
-    });
+    renderUsersRows(resp.data.items);
   }
 });
 

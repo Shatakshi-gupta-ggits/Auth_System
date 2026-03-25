@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
 
 const User = mongoose.model(
   "User",
@@ -13,6 +14,7 @@ const User = mongoose.model(
         type: String,
         required: true,
         unique: true,
+        index: true,
         lowercase: true,
         trim: true,
       },
@@ -28,9 +30,9 @@ const User = mongoose.model(
         type: Date,
         default: null,
       },
-      monthlySalary: {
+      salary: {
         type: Number,
-        default: null,
+        default: 0,
         min: 0,
       },
       role: {
@@ -55,5 +57,33 @@ const User = mongoose.model(
     }
   )
 );
+
+// Backward compatibility: old UI/controllers used `monthlySalary`.
+// Keep it as a virtual alias that maps to the canonical `salary` field.
+User.schema.virtual("monthlySalary")
+  .get(function () {
+    return this.salary;
+  })
+  .set(function (v) {
+    this.salary = v;
+  });
+
+// Hash password on save if it's a plain password (avoid double-hashing bcrypt hashes).
+User.schema.pre("save", async function (next) {
+  try {
+    if (!this.isModified("password")) return next();
+    if (!this.password) return next();
+
+    const pwd = String(this.password);
+    const looksLikeBcryptHash = pwd.startsWith("$2");
+    if (looksLikeBcryptHash) return next();
+
+    const saltRounds = 8;
+    this.password = await bcrypt.hash(pwd, saltRounds);
+    return next();
+  } catch (err) {
+    return next(err);
+  }
+});
 
 module.exports = User;

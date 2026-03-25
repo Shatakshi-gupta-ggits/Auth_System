@@ -1,4 +1,4 @@
-const { authJwt } = require("../middlewares");
+const { authJwt, upload, verifyAdminRoleAndSalary } = require("../middlewares");
 const controller = require("../controllers/user.controller");
 
 module.exports = function(app) {
@@ -24,5 +24,11 @@ module.exports = function(app) {
     "/api/test/admin",
     [authJwt.verifyToken, authJwt.isAdmin],
     controller.adminBoard
+  );
+
+  app.patch(
+    "/api/user/me",
+    [authJwt.verifyToken, verifyAdminRoleAndSalary, upload.single("profilePic")],
+    controller.updateMe
   );
 };
