@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../auth/AuthProvider.jsx";
 import { useNavigate } from "react-router-dom";
 import { BACKEND_URL } from "../api/backendBase.js";
+import { createProfileService } from "../api/services/profileService.js";
 
 function formatDate(v) {
   if (!v) return "-";
@@ -13,6 +14,8 @@ function formatDate(v) {
 export default function ManagerDashboard() {
   const { user, token, logout } = useAuth();
   const navigate = useNavigate();
+
+  const profileApi = useMemo(() => createProfileService(BACKEND_URL), []);
 
   const [team, setTeam] = useState([]);
   const [loadingTeam, setLoadingTeam] = useState(false);
@@ -74,19 +77,14 @@ export default function ManagerDashboard() {
       return;
     }
 
-    const fd = new FormData();
-    fd.append("name", String(profileForm.name || "").trim());
-    fd.append("email", email);
-    if (profileForm.profilePic) fd.append("profilePic", profileForm.profilePic);
-
-    const res = await fetch(`${BACKEND_URL}/api/user/me`, {
-      method: "PATCH",
-      headers: { Authorization: `Bearer ${token}` },
-      body: fd,
-    });
-    const data = await res.json().catch(() => null);
-    if (!res.ok) {
-      alert(data?.message || "Profile update failed.");
+    try {
+      await profileApi.updateProfile({
+        name: profileForm.name,
+        email,
+        profilePic: profileForm.profilePic,
+      });
+    } catch (err) {
+      alert(err.message || "Profile update failed.");
       return;
     }
     alert("Profile updated successfully.");
@@ -96,25 +94,21 @@ export default function ManagerDashboard() {
 
   async function onChangePassword(e) {
     e.preventDefault();
-    if (String(pwForm.newPassword || "").length < 6) {
-      alert("New password must be at least 6 characters.");
+
+    const pwd = String(pwForm.newPassword || "");
+    const ok =
+      pwd.length >= 8 && /[a-z]/.test(pwd) && /[A-Z]/.test(pwd) && /\d/.test(pwd);
+    if (!ok) {
+      alert("Password must be 8+ chars and include upper, lower, and a number.");
       return;
     }
-
-    const res = await fetch(`${BACKEND_URL}/api/user/change-password`, {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
+    try {
+      await profileApi.changePassword({
         currentPassword: pwForm.currentPassword,
         newPassword: pwForm.newPassword,
-      }),
-    });
-    const data = await res.json().catch(() => null);
-    if (!res.ok) {
-      alert(data?.message || "Password change failed.");
+      });
+    } catch (err) {
+      alert(err.message || "Password change failed.");
       return;
     }
     alert("Password changed successfully.");

@@ -223,13 +223,7 @@ export default function AdminDashboard() {
     const ok = window.confirm("Delete this user?");
     if (!ok) return;
     try {
-        const res = await fetch(`${BACKEND_URL}/api/admin/users/${userId}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-        credentials: "include",
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.message || "Delete failed");
+      await adminApi.deleteUser(userId);
       pushToast("success", "User deleted");
       await loadUsersAgain();
     } catch (e) {
@@ -689,11 +683,7 @@ export default function AdminDashboard() {
               const ok = window.confirm("Update salary?");
               if (!ok) return;
               try {
-                await apiPut(
-                  `/api/admin/users/${salaryModal.userId}/salary`,
-                  JSON.stringify({ salary: salaryValue }),
-                  { "Content-Type": "application/json" }
-                );
+                await adminApi.updateSalary(salaryModal.userId, salaryValue);
                 pushToast("success", "Salary updated");
                 closeSalaryModal();
                 await loadUsersAgain();
@@ -741,7 +731,7 @@ export default function AdminDashboard() {
                 if (newUserForm.dob) fd.append("dob", newUserForm.dob);
                 if (newUserForm.profilePic) fd.append("profilePic", newUserForm.profilePic);
 
-                await apiPost("/api/admin/users", fd);
+                await adminApi.createUser(fd);
                 pushToast("success", "User created");
                 setNewUserModalOpen(false);
                 setNewUserForm({

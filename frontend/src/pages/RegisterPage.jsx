@@ -12,10 +12,30 @@ export default function RegisterPage() {
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
+  function validateForm() {
+    const n = String(name || "").trim();
+    const e = String(email || "").trim();
+    const p = String(password || "");
+
+    if (!n) return "Name is required.";
+    if (!e || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return "Please enter a valid email.";
+
+    const ok =
+      p.length >= 8 && /[a-z]/.test(p) && /[A-Z]/.test(p) && /\d/.test(p);
+    if (!ok) return "Password must be 8+ chars and include upper, lower, and a number.";
+
+    return null;
+  }
+
   async function onSubmit(e) {
     e.preventDefault();
     setError(null);
     try {
+      const msg = validateForm();
+      if (msg) {
+        setError(msg);
+        return;
+      }
       await register({ name, email, password, dob: dob || null, profilePic });
       // Backend forces role=employee and salary=0
       navigate("/employee-dashboard", { replace: true });

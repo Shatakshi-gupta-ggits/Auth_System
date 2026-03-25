@@ -21,7 +21,17 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
     try {
-      const result = await login(email, password);
+      const e = String(email || "").trim();
+      const p = String(password || "");
+      if (!e || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+        setError("Please enter a valid email.");
+        return;
+      }
+      if (!p || p.length < 1) {
+        setError("Password is required.");
+        return;
+      }
+      const result = await login(e, p);
       const role = result?.user?.role || "employee";
       navigate(roleToPath(role), { replace: true });
     } catch (err) {
