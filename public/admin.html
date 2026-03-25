@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Admin Management</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header class="header">
+        <h1>Admin Management</h1>
+        <p class="muted">Uses the same login session from the user page. Admin role required.</p>
+        <p><a href="/ui">Go to Login / Registration page</a></p>
+      </header>
+
+      <section class="card">
+        <h2>Status</h2>
+        <p id="adminStatus" class="muted">Checking your session...</p>
+      </section>
+
+      <section id="managementSection" class="card">
+        <h2>Create User</h2>
+        <form id="createUserForm" enctype="multipart/form-data" class="row wrap">
+          <input name="name" placeholder="name" required />
+          <input name="email" type="email" placeholder="email" required />
+          <input name="password" type="password" placeholder="password" required />
+          <select name="role">
+            <option value="employee">employee</option>
+            <option value="manager">manager</option>
+            <option value="admin">admin</option>
+          </select>
+          <input name="dob" type="date" />
+          <input name="monthlySalary" type="number" min="0" step="0.01" placeholder="salary" />
+          <input name="profilePic" type="file" accept="image/*" />
+          <button type="submit">Create</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>All Registered Users</h2>
+        <div class="row wrap">
+          <button id="refreshUsersBtn" type="button">Refresh Table</button>
+        </div>
+        <div class="table-wrap">
+          <table id="usersTable" class="users-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>DOB</th>
+                <th>Salary</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="usersTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>User Management (Advanced)</h2>
+        <form id="searchForm" class="row wrap">
+          <input name="search" placeholder="search name/email" />
+          <input name="page" type="number" min="1" value="1" />
+          <input name="limit" type="number" min="1" max="50" value="10" />
+          <button type="submit">Search/List</button>
+        </form>
+        <form id="getByIdForm" class="row wrap">
+          <input name="id" placeholder="user id" required />
+          <button type="submit">Get by ID</button>
+        </form>
+        <form id="promoteForm" class="row wrap">
+          <input name="id" placeholder="user id" required />
+          <button type="submit">Promote to Manager</button>
+        </form>
+        <form id="updateForm" enctype="multipart/form-data" class="row wrap">
+          <input name="id" placeholder="user id" required />
+          <input name="name" placeholder="new name" />
+          <input name="dob" type="date" />
+          <input name="monthlySalary" type="number" min="0" step="0.01" placeholder="new salary" />
+          <input name="profilePic" type="file" accept="image/*" />
+          <button type="submit">Update</button>
+        </form>
+        <form id="deleteForm" class="row wrap">
+          <input name="id" placeholder="user id" required />
+          <button type="submit">Delete</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>Output</h2>
+        <pre id="output" class="output"></pre>
+      </section>
+    </main>
+    <script src="/admin.js"></script>
+  </body>
+</html>

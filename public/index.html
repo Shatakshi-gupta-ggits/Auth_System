@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Minimal Auth UI</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header class="header">
+        <h1>Minimal Login / Registration</h1>
+        <p class="muted">Calls your Express + MongoDB auth API end-to-end.</p>
+        <p><a href="/admin">Open Admin Management View</a></p>
+      </header>
+
+      <section class="grid">
+        <div class="card">
+          <h2>Register</h2>
+          <form id="signupForm" enctype="multipart/form-data">
+            <label>
+              Name
+              <input name="name" required />
+            </label>
+            <label>
+              Email
+              <input name="email" type="email" autocomplete="email" required />
+            </label>
+            <label>
+              Password
+              <input name="password" type="password" autocomplete="new-password" required />
+            </label>
+            <label>
+              Role
+              <select name="role" required>
+                <option value="employee">employee</option>
+                <option value="manager">manager</option>
+              </select>
+            </label>
+            <label>
+              DOB (optional)
+              <input name="dob" type="date" />
+            </label>
+            <label>
+              Monthly Salary (optional)
+              <input name="monthlySalary" type="number" min="0" step="0.01" />
+            </label>
+            <label>
+              Profile Pic (optional)
+              <input name="profilePic" type="file" accept="image/*" />
+            </label>
+            <button type="submit">Sign up</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <h2>Login</h2>
+          <form id="signinForm">
+            <label>
+              Email
+              <input name="email" type="email" autocomplete="email" required />
+            </label>
+            <label>
+              Password
+              <input name="password" type="password" autocomplete="current-password" required />
+            </label>
+            <button type="submit">Sign in</button>
+          </form>
+
+          <div class="row">
+            <button id="signoutBtn" type="button" class="secondary">Sign out</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="userDashboard" class="card" style="display: none;">
+        <h2 id="dashboardTitle">My Dashboard</h2>
+        <p id="welcomeText" class="muted">Welcome</p>
+
+        <div class="profile">
+          <img id="profilePicImg" alt="Profile picture" class="profilePic" style="display: none;" />
+          <div class="profileFields">
+            <p><strong>Name:</strong> <span id="profileName"></span></p>
+            <p><strong>Email:</strong> <span id="profileEmail"></span></p>
+            <p><strong>Role:</strong> <span id="profileRoles"></span></p>
+            <p><strong>DOB:</strong> <span id="profileDob"></span></p>
+            <p><strong>Monthly Salary:</strong> <span id="profileMonthlySalary"></span></p>
+          </div>
+        </div>
+
+        <div class="boardBox">
+          <h3>My Board</h3>
+          <p id="boardMessage" class="muted">—</p>
+        </div>
+
+        <div class="row wrap" id="userActions"></div>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
