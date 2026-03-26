@@ -12,16 +12,6 @@ module.exports = function(app) {
     next();
   });
 
-  app.post(
-    "/api/auth/signup",
-    [
-      upload.single("profilePic"),
-      verifySignUp.checkDuplicateEmail,
-      verifySignUp.checkRolesExisted,
-    ],
-    controller.signup
-  );
-
   const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 10,
@@ -29,6 +19,17 @@ module.exports = function(app) {
     legacyHeaders: false,
     message: { message: "Too many requests. Please try again later." },
   });
+
+  app.post(
+    "/api/auth/signup",
+    [
+      authLimiter,
+      upload.single("profilePic"),
+      verifySignUp.checkDuplicateEmail,
+      verifySignUp.checkRolesExisted,
+    ],
+    controller.signup
+  );
 
   function handleValidation(req, res, next) {
     const result = validationResult(req);

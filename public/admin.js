@@ -5,6 +5,72 @@ const managementSection = document.getElementById("managementSection");
 const usersTableBody = document.getElementById("usersTableBody");
 let isAdminLoggedIn = false;
 
+const ACCESS_TOKEN_KEY = "accessToken";
+let isAutoLoggingOut = false;
+
+function getStoredAccessToken() {
+  try {
+    return sessionStorage.getItem(ACCESS_TOKEN_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function decodeJwtPayload(token) {
+  try {
+    const parts = String(token).split(".");
+    if (parts.length < 2) return null;
+    const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const json = decodeURIComponent(
+      atob(b64)
+        .split("")
+        .map((c) => "%" + c.charCodeAt(0).toString(16).padStart(2, "0"))
+        .join("")
+    );
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+function isJwtExpired(token) {
+  const payload = decodeJwtPayload(token);
+  if (!payload || !payload.exp) return false;
+  return Date.now() >= Number(payload.exp) * 1000;
+}
+
+function clearLocalAuthState() {
+  try {
+    sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+  } catch (_) {
+    // ignore
+  }
+}
+
+async function callBackendLogout(token) {
+  try {
+    const headers = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    await fetch("/api/auth/signout", { method: "POST", headers, credentials: "include" });
+  } catch {
+    // ignore
+  }
+}
+
+async function autoLogout({ message, redirectTo = "/ui" } = {}) {
+  if (isAutoLoggingOut) return;
+  isAutoLoggingOut = true;
+  const token = getStoredAccessToken();
+
+  adminStatus.textContent = message || "Your session has expired. Redirecting to login...";
+  await callBackendLogout(token);
+  clearLocalAuthState();
+
+  setTimeout(() => {
+    window.location.href = redirectTo;
+  }, 1200);
+}
+
 function setAdminUiState(enabled, message) {
   isAdminLoggedIn = enabled;
   managementSection.style.display = enabled ? "block" : "none";
@@ -21,9 +87,22 @@ async function api(path, { method = "GET", body } = {}) {
     headers["Content-Type"] = "application/json";
     payload = JSON.stringify(body);
   }
+  const token = getStoredAccessToken();
+  if (token && isJwtExpired(token)) {
+    await autoLogout({ message: "Session expired. Redirecting to login..." });
+    return { ok: false, status: 401, data: null };
+  }
+
+  if (token) headers.Authorization = `Bearer ${token}`;
+
   const res = await fetch(path, { method, headers, body: payload, credentials: "include" });
   const ct = res.headers.get("content-type") || "";
   const data = ct.includes("application/json") ? await res.json().catch(() => null) : await res.text();
+  if (res.status === 401 || res.status === 403) {
+    await autoLogout({ message: "Your session has expired. Redirecting to login..." });
+    return { ok: false, status: res.status, data };
+  }
+
   return { ok: res.ok, status: res.status, data };
 }
 

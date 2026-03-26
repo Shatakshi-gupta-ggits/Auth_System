@@ -185,8 +185,15 @@ exports.signup = async (req, res) => {
       return res.status(400).send({ message: "name, email and password are required." });
     }
 
-    if (String(password).length < 6) {
-      return res.status(400).send({ message: "Password must be at least 6 characters." });
+    // Strong password requirement:
+    // 8+ chars, includes upper, lower, and a number.
+    const pwd = String(password);
+    const ok =
+      pwd.length >= 8 && /[a-z]/.test(pwd) && /[A-Z]/.test(pwd) && /\d/.test(pwd);
+    if (!ok) {
+      return res.status(400).send({
+        message: "Password must be 8+ chars and include upper, lower, and a number.",
+      });
     }
 
     const normalizedEmail = String(email).trim().toLowerCase();

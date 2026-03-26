@@ -9,6 +9,7 @@ const profileDob = document.getElementById("profileDob");
 const profileMonthlySalary = document.getElementById("profileMonthlySalary");
 const boardMessage = document.getElementById("boardMessage");
 const userActions = document.getElementById("userActions");
+const authMessage = document.getElementById("authMessage");
 
 const profilePicInput = document.getElementById("profilePicInput");
 const profilePicPreviewImg = document.getElementById("profilePicPreviewImg");
@@ -133,6 +134,11 @@ function isProfilePicFileAllowed(file) {
   return { ok: false, message: "Only JPG, PNG, and GIF images are allowed." };
 }
 
+function isStrongPassword(pwd) {
+  const s = String(pwd || "");
+  return s.length >= 8 && /[a-z]/.test(s) && /[A-Z]/.test(s) && /\d/.test(s);
+}
+
 function setUploading(isUploading) {
   if (!profilePicInput || !uploadProfilePicBtn) return;
   profilePicInput.disabled = isUploading;
@@ -171,7 +177,8 @@ function renderUserDashboard(user) {
     welcomeText.textContent = "";
     userActions.innerHTML = "";
     resetUploadUI();
-    if (sessionExpiryNoticeEl) sessionExpiryNoticeEl.style.display = "none";
+    // Preserve the expiry notice while auto-logout is in progress.
+    if (sessionExpiryNoticeEl && !isAutoLoggingOut) sessionExpiryNoticeEl.style.display = "none";
     return;
   }
 
@@ -264,9 +271,19 @@ document.getElementById("signupForm").addEventListener("submit", async (e) => {
   const email = (fd.get("email") || "").toString();
   const password = (fd.get("password") || "").toString();
 
+  if (authMessage) authMessage.textContent = "";
+  if (!isStrongPassword(password)) {
+    if (authMessage) {
+      authMessage.textContent =
+        "Password must be 8+ chars and include upper, lower, and a number.";
+    }
+    return;
+  }
+
   const signupResp = await apiFetch("/api/auth/signup", { method: "POST", body: fd });
 
   if (!signupResp.ok) {
+    if (authMessage) authMessage.textContent = signupResp?.data?.message || "Signup failed.";
     return;
   }
 
@@ -291,21 +308,29 @@ document.getElementById("signinForm").addEventListener("submit", async (e) => {
     email: fd.get("email"),
     password: fd.get("password"),
   };
+
+  if (authMessage) authMessage.textContent = "";
   const resp = await apiFetch("/api/auth/signin", { method: "POST", body });
   if (resp.ok) {
+    const accessToken = resp?.data?.accessToken || resp?.data?.token;
+    if (accessToken) setStoredAccessToken(accessToken);
     renderUserDashboard(resp.data.user);
     const role = String(resp?.data?.user?.role || "").toLowerCase();
     if (role === "admin") {
       window.location.href = "/admin";
       return;
     }
+  } else {
+    if (authMessage) authMessage.textContent = resp?.data?.message || "Sign in failed.";
   }
 });
 
 document.getElementById("signoutBtn").addEventListener("click", async () => {
-  const resp = await apiFetch("/api/auth/signout", { method: "POST" });
-  // Even if signout failed, clear local UI state.
+  const token = getStoredAccessToken();
+  await callBackendLogout(token);
+  setStoredAccessToken(null);
   renderUserDashboard(null);
+  window.location.href = "/ui";
 });
 
 (async () => {
@@ -347,6 +372,12 @@ if (profilePicInput && uploadProfilePicBtn) {
       return;
     }
 
+    const token = getStoredAccessToken();
+    if (token && isJwtExpired(token)) {
+      await autoLogout({ message: "Session expired. Redirecting to login..." });
+      return;
+    }
+
     setUploading(true);
     uploadProgressBar.value = 0;
     uploadProgressText.textContent = "0%";
@@ -357,6 +388,7 @@ if (profilePicInput && uploadProfilePicBtn) {
     const xhr = new XMLHttpRequest();
     xhr.open("PATCH", "/api/user/me");
     xhr.withCredentials = true; // use cookie-session JWT
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
 
     xhr.upload.onprogress = (e) => {
       if (!e.lengthComputable) return;
@@ -367,6 +399,12 @@ if (profilePicInput && uploadProfilePicBtn) {
 
     xhr.onload = () => {
       setUploading(false);
+      if (xhr.status === 401 || xhr.status === 403) {
+        autoLogout({ message: "Your session has expired. Redirecting to login..." });
+        uploadProgressWrap.style.display = "none";
+        return;
+      }
+
       if (xhr.status >= 200 && xhr.status < 300) {
         let data;
         try {

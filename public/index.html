@@ -30,7 +30,7 @@
             </label>
             <label>
               Password
-              <input name="password" type="password" autocomplete="new-password" required />
+              <input name="password" type="password" autocomplete="new-password" required minlength="8" />
             </label>
             <label>
               Role
@@ -53,6 +53,7 @@
             </label>
             <button type="submit">Sign up</button>
           </form>
+          <p id="authMessage" class="muted"></p>
         </div>
 
         <div class="card">
