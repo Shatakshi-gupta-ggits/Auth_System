@@ -6,6 +6,13 @@ const dbConfig = require("../app/config/db.config");
 const User = db.user;
 
 async function main() {
+  // Inject a temporary pre-save hook to confirm middleware is running.
+  // This only affects this test document.
+  User.schema.pre("save", function (next) {
+    this.name = `${this.name} [hooked]`;
+    next();
+  });
+
   const mongoUri =
     process.env.MONGO_URI ||
     dbConfig.URI ||
@@ -26,7 +33,10 @@ async function main() {
     isLoggedIn: false,
     lastLoginAt: null,
   });
+  console.log("u.password before save prefix:", String(u.password).slice(0, 3));
   await u.save();
+  console.log("u.password after save prefix:", String(u.password).slice(0, 3));
+  console.log("u.name after save:", String(u.name));
 
   const saved = await User.findOne({ email }).exec();
   if (!saved) throw new Error("Test user not saved");
